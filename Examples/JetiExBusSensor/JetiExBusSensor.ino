@@ -7,7 +7,8 @@
   
   Version history:
   0.90   02/04/2018  created
-  
+  0.91   02/09/2018  Support for AtMega32u4 added
+
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the "Software"),
   to deal in the Software without restriction, including without limitation
