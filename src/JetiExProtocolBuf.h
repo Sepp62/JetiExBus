@@ -37,7 +37,9 @@
  #include <WProgram.h>
 #endif
 
-#include <new.h>
+#ifndef ESP32
+  #include <new.h>
+#endif 
 
 // Definition of Jeti sensor (aka "Equipment")
 

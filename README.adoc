@@ -1,12 +1,13 @@
-= Jeti Ex Bus Sensor Library for Teensy 3.x
+= Jeti Ex Bus Sensor Library for Arduino
 
 Serial interface to send telemetry and receive channel data to/from Jeti Duplex receivers via EX Bus.
-Current version is for Teensy 3.x. only
+Current version is for Teensy 3.x., AtMega32u4 and ESP32
 
   Version history:
 
     0.90   02/08/2018  created
     0.91   02/09/2018  Support for AtMega32u4 added
+    0.92   02/14/2018  Support for ESP32 added
 
 == License ==
 

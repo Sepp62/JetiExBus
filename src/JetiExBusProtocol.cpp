@@ -72,7 +72,7 @@ void JetiExBusProtocol::DoJetiExBus()
 	while (m_pSerial->available())
 	{
 		int c = m_pSerial->read();
-		// DumpChar( (char)c );
+		 // DumpChar( (char)c );
 
 		if (m_state == WAIT_HDR_START)
 		{
@@ -117,7 +117,7 @@ void JetiExBusProtocol::DoJetiExBus()
 			{
 				if (ReceiveCRCCheck() )
 				{
-					// DumpPacket();
+					//  DumpPacket();
 					m_nPacketId = m_exBusBuffer[3];
 					
 					// packet contains channel data 
@@ -300,7 +300,7 @@ void JetiExBusProtocol::DumpChar(char c)
 	idx += 2;
 	buf[idx++] = ' ';
 
-	if (idx > 0)
+	if (idx > 0 && idx < sizeof( buf ) )
 		buf[idx++] = '\0';
 
 	Serial.println(buf);
