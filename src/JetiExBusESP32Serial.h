@@ -9,6 +9,7 @@
   
   Version history:
   0.90   02/13/2018  created
+  0.93   02/16/2018  ESP32 uart initialization changed
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the "Software"),
@@ -48,7 +49,14 @@
 class ESP32HardwareSerial : public HardwareSerial
 {
 public:
-	ESP32HardwareSerial(int uart_nr) : HardwareSerial(uart_nr) { m_txPin = getTxDefaultPin(); }
+	ESP32HardwareSerial(int uart_nr) : HardwareSerial(uart_nr), m_txPin(-1) {}
+
+	void begin(unsigned long baud, uint32_t config)
+	{
+		HardwareSerial::begin(baud, config);
+		m_txPin = getTxDefaultPin();
+		uartDetachTx();
+	}
 
     // see ...\Arduino\hardware\espressif\esp32\cores\esp32\esp32-hal-uart.c
 	void uartDetachTx()
@@ -84,7 +92,7 @@ class JetiExBusESP32Serial : public JetiExBusSerial
 public:
 	JetiExBusESP32Serial(int comPort = 2);
 
-	virtual void   begin(uint32_t baud, uint32_t format) { m_pSerial->begin(baud, format); }
+	virtual void   begin(uint32_t baud, uint32_t format){ m_pSerial->begin(baud, format); }
 	virtual size_t write(const uint8_t *buffer, size_t size);
 	virtual int    available(void) { return m_pSerial->available(); }
 	virtual int    read(void) { return m_pSerial->read(); }

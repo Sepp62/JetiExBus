@@ -9,6 +9,7 @@ Copyright (C) 2018 Bernd Wokoeck
 
 Version history:
 0.90   02/13/2018  created
+0.93   02/16/2018  ESP32 uart initialization changed
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the "Software"),
@@ -60,9 +61,7 @@ JetiExBusSerial * JetiExBusSerial::CreatePort(int comPort)
 JetiExBusESP32Serial::JetiExBusESP32Serial(int comPort) : m_pSerial(0)
 {
 	m_pSerial = &Esp32Serial;
-	m_pSerial->uartDetachTx();
 }
-
 
 size_t JetiExBusESP32Serial::write(const uint8_t *buffer, size_t size)
 {
