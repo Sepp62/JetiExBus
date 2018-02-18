@@ -33,6 +33,8 @@
 #ifndef JETIEXBUSATMEGASERIAL_H
 #define JETIEXBUSATMEGASERIAL_H
 
+#if defined (ARDUINO_ARCH_AVR) && !defined(__AVR_ATmega328PB__)
+
 #include "JetiExBusSerial.h"
 
 #if ARDUINO >= 100
@@ -40,8 +42,6 @@
 #else
  #include <WProgram.h>
 #endif
-
-#if defined (ARDUINO_ARCH_AVR)
 
 #if defined (__AVR_ATmega32U4__)
 #define _BV(bit) (1 << (bit))

@@ -9,7 +9,8 @@ Current version is for Teensy 3.x., AtMega32u4 and ESP32
     0.91   02/09/2018  Support for AtMega32u4 added
     0.92   02/14/2018  Support for ESP32 added
     0.93   02/16/2018  ESP32 uart initialization changed
-  
+    0.94   02/17/2018  Generic Arduino HardwareSerial support for AtMega328PB
+	
 == License ==
 
  Copyright (C) 2018 by Bernd Wokoeck

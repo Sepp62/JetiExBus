@@ -31,6 +31,8 @@
 
 #include "JetiExBusProtocol.h"
 
+// #define JEXTIEXBUS_PROTOCOL_DEBUG
+
 JetiExBusProtocol::JetiExBusProtocol() : m_pSerial(NULL), m_exFrameCnt(0), m_nButtons(0), m_bNewChannelData(false), m_nNumChannels(0)
 {
 	ResetPacket();
@@ -262,10 +264,8 @@ void JetiExBusProtocol::SetJetiboxText(int lineNo, const char* text)
 }
 
 
-//////////////////////
-// debug and helpers
-//////////////////////
-
+// CRC calculation
+//////////////////
 uint16_t JetiExBusProtocol::crc_ccitt_update(uint16_t crc, uint8_t data)
 {
 	uint16_t ret_val;
@@ -277,32 +277,37 @@ uint16_t JetiExBusProtocol::crc_ccitt_update(uint16_t crc, uint8_t data)
 	return ret_val;
 }
 
+//////////////////////
+// debug 
+//////////////////////
+#ifdef JEXTIEXBUS_PROTOCOL_DEBUG
+	void JetiExBusProtocol::DumpPacket()
+	{
+		Serial.println("");
+		Serial.println("--- dump start ---");
+		for (int i = 0; i < m_nBytes; i++)
+			DumpChar(m_exBusBuffer[i]);
+		Serial.println("");
+		Serial.println("--- dump end ---");
+	}
 
-void JetiExBusProtocol::DumpPacket()
-{
-	Serial.println("");
-	Serial.println("--- dump start ---");
-	for (int i = 0; i < m_nBytes; i++)
-		DumpChar(m_exBusBuffer[i]);
-	Serial.println("");
-	Serial.println("--- dump end ---");
-}
+	void JetiExBusProtocol::DumpChar(char c)
+	{
+		char buf[5];
+		int idx = 0;
 
+		buf[idx++] = '0';
+		buf[idx++] = 'x';
+		itoa(((int)c) & 0x00FF, &buf[idx], 16);
+		idx += 2;
+		buf[idx++] = ' ';
 
-void JetiExBusProtocol::DumpChar(char c)
-{
-	char buf[5];
-	int idx = 0;
+		if (idx > 0 && idx < (int)sizeof( buf ) )
+			buf[idx++] = '\0';
 
-	buf[idx++] = '0';
-	buf[idx++] = 'x';
-	itoa(((int)c) & 0x00FF, &buf[idx], 16);
-	idx += 2;
-	buf[idx++] = ' ';
-
-	if (idx > 0 && idx < sizeof( buf ) )
-		buf[idx++] = '\0';
-
-	Serial.println(buf);
-}
-
+		Serial.println(buf);
+	}
+#else
+  void JetiExBusProtocol::DumpPacket() {}
+  void JetiExBusProtocol::DumpChar(char c) {}
+#endif // JEXTIEXBUS_PROTOCOL_DEBUG

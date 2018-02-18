@@ -30,7 +30,7 @@ IN THE SOFTWARE.
 
 **************************************************************/
 
-#if defined (ARDUINO_ARCH_AVR)
+#if defined (ARDUINO_ARCH_AVR) && !defined(__AVR_ATmega328PB__)
 
 #include "JetiExBusAtMegaSerial.h"
 
