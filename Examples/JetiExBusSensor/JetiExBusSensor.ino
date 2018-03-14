@@ -34,6 +34,9 @@
 #include "JetiExBusProtocol.h"
 #include "DemoSensor.h"
 
+// Show received channel data at most every X milliseconds
+#define SHOW_CHANNEL_EACH_MS 500
+
 JetiExBusProtocol exBus;
 DemoSensor        demoSensor;
 
@@ -95,18 +98,19 @@ void setup()
 	exBus.SetJetiboxText(1, "Line2");
 }
 
+unsigned long last_channel_show_time = 0;
 void loop()
 {
 	char buf[20];
 
 	// channel data
-	if (false)
-	//	 if ( exBus.HasNewChannelData() )
+	if ((millis() - last_channel_show_time > SHOW_CHANNEL_EACH_MS) && exBus.HasNewChannelData())
 	{
+		last_channel_show_time = millis();
 		int i;
 		for (i = 0; i < exBus.GetNumChannels(); i++)
 		{
-			sprintf(buf, "chan-%d: %d", i, exBus.GetChannel(i));
+			sprintf(buf, "ch-%d:\t%d.%03d", i+1, exBus.GetChannel(i)/8,125*(exBus.GetChannel(i)%8));
 			Serial.println(buf);
 		}
 	}

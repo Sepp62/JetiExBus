@@ -151,9 +151,9 @@ void JetiExBusProtocol::DecodeChannelData()
 
 	m_nNumChannels = m_exBusBuffer[5] / 2;  // number of channels
 	
-	uint16_t * pChannel = (uint16_t*)&m_exBusBuffer[6];  // first channel data position
-	for (int i = 0; i < m_nNumChannels; i++)
-		m_channelValues[i] = *(pChannel++);
+	for (int i = 0; i < m_nNumChannels; i++){
+		m_channelValues[i] = (uint16_t) (m_exBusBuffer[6+2*i+1] << 8) + m_exBusBuffer[6+2*i];
+	}
 	
 	m_bNewChannelData = true;
 }
