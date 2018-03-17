@@ -10,6 +10,8 @@
   0.91   02/09/2018  Support for AtMega32u4 added
   0.92   02/14/2018  Support for ESP32 added
   0.93   02/16/2018  ESP32 uart initialization changed
+  0.94   02/17/2018  Generic arduino HardwareSerial support for AtMega328PB
+  0.95   03/17/2018  Synchronization (IsBusReleased) for time consuming operations
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the "Software"),
@@ -89,7 +91,7 @@ void setup()
 		;
 
 	exBus.SetDeviceId(0x76, 0x32); // 0x3276
-	exBus.Start("EX Bus", sensors, 2 );
+	exBus.Start("EX Bus", sensors, 2 ); // com port: 1..3 for Teeny, 0 or 1 for AtMega328PB UART0/UART1, others: not used 
 
 	exBus.SetJetiboxText(0, "Line1");
 	exBus.SetJetiboxText(1, "Line2");
@@ -97,11 +99,11 @@ void setup()
 
 void loop()
 {
-	char buf[20];
+	char buf[30];
 
 	// channel data
 	if (false)
-	//	 if ( exBus.HasNewChannelData() )
+	// if ( exBus.HasNewChannelData() )
 	{
 		int i;
 		for (i = 0; i < exBus.GetNumChannels(); i++)
@@ -116,6 +118,13 @@ void loop()
 	{
 		Serial.print( "bt - "); Serial.println(bt);
     }
+
+	if (exBus.IsBusReleased())
+	{
+		// exBus is currently sending an ex packet
+		// do time consuming stuff here (20-30ms)
+		delay( 30 );
+	}
 
 	// sensor data
 	exBus.SetSensorValue(ID_VOLTAGE, demoSensor.GetVoltage());

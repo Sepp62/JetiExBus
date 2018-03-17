@@ -8,7 +8,8 @@
   
   Version history:
   0.90   02/04/2018  created
-  
+  0.95   03/17/2018  Synchronization (IsBusReleased) for time consuming operations
+
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the "Software"),
   to deal in the Software without restriction, including without limitation
@@ -57,6 +58,8 @@ public:
 	void     SetJetiboxText(int lineNo, const char* text);
 	uint8_t  GetJetiboxKey() { uint8_t b = m_nButtons; m_nButtons = 0; return b; }
 
+	bool     IsBusReleased() { bool ret = m_bBusReleased;  m_bBusReleased = false; return ret; }
+
 protected:
 
 	JetiExBusSerial * m_pSerial;
@@ -89,6 +92,9 @@ protected:
 
 	// jetibox text buffer
 	char m_textBuffer[32];
+
+	// lib is now sending on bus
+	bool m_bBusReleased;
 
 	// helpers
 	void DecodeChannelData();

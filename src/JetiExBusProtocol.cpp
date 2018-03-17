@@ -8,7 +8,8 @@
   
   Version history:
   0.90   02/04/2018  created
-  
+  0.95   03/17/2018  Synchronization (IsBusReleased) for time consuming operations
+
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the "Software"),
   to deal in the Software without restriction, including without limitation
@@ -33,7 +34,7 @@
 
 // #define JEXTIEXBUS_PROTOCOL_DEBUG
 
-JetiExBusProtocol::JetiExBusProtocol() : m_pSerial(NULL), m_exFrameCnt(0), m_nButtons(0), m_bNewChannelData(false), m_nNumChannels(0)
+JetiExBusProtocol::JetiExBusProtocol() : m_pSerial(NULL), m_exFrameCnt(0), m_nButtons(0), m_bNewChannelData(false), m_nNumChannels(0), m_bBusReleased(false)
 {
 	ResetPacket();
 	memset(m_channelValues, 0, sizeof(m_channelValues));
@@ -131,11 +132,13 @@ void JetiExBusProtocol::DoJetiExBus()
 					else if( m_exBusBuffer[ 4 ] == 0x3a && m_bReleaseBus )
 					{
 						SendTelemetryData();
+						m_bBusReleased = true;
 					}
 					// packet is a Jetibox request
 					else if (m_exBusBuffer[4] == 0x3b && m_bReleaseBus )
 					{
 						SendJetiBoxData();
+						m_bBusReleased = true;
 					}
 				}
 				m_state = WAIT_HDR_START;
