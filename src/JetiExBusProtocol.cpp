@@ -131,8 +131,10 @@ void JetiExBusProtocol::DoJetiExBus()
 					// packet is a telemetry request
 					else if( m_exBusBuffer[ 4 ] == 0x3a && m_bReleaseBus )
 					{
+//						digitalWrite(PIN_A0, HIGH);
 						SendTelemetryData();
 						m_bBusReleased = true;
+//						digitalWrite(PIN_A0, LOW);
 					}
 					// packet is a Jetibox request
 					else if (m_exBusBuffer[4] == 0x3b && m_bReleaseBus )

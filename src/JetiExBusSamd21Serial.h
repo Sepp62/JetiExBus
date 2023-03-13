@@ -2,10 +2,11 @@
 Jeti Sensor EX Bus Telemetry C++ Library
 
 JetiExBusSamd21Serial - Samd21 serial implementation for half duplex 
-single wire operation, compatible with Seeedstudio XIAO m0.
+single wire DMA operation, compatible with Seeedstudio XIAO m0.
 
 this is an addon from nichtgedacht
 Version history: 1.0 initial
+                 2.0 using DMA for UART
 
 JetiExBus Library is: 
 ---------------------------------------------------------------------
@@ -44,40 +45,44 @@ IN THE SOFTWARE.
  #include <WProgram.h>
 #endif
 
-#endif // __SAMD21__
+// DMA descriptors
+// outside of object because of alignment 
+volatile DmacDescriptor dmaDescriptor[2] __attribute__((aligned(16)));
+volatile DmacDescriptor dmaWriteback[2] __attribute__((aligned(16)));
 
 // SAMD21
 //////////
 
 class JetiExBusSamd21Serial : public JetiExBusSerial
 {
-	friend void SERCOM0_Handler(void);
+	friend void DMAC_Handler(void);
 	
 public:
 	virtual void   begin(uint32_t baud, uint32_t format);
 	virtual size_t write(const uint8_t *buffer, size_t size);
-  virtual int    available(void);
+	virtual int    available(void);
 	virtual int    read(void);
 
 protected:
-	enum
-	{
-		TX_RINGBUF_SIZE = 64, 
-		RX_RINGBUF_SIZE = 64,
-	};
+  enum
+  {
+    TX_RINGBUF_SIZE = 128, 
+    RX_RINGBUF_SIZE = 128,
+  };
 
-	// tx buffer
-	volatile uint8_t   m_txBuf[ TX_RINGBUF_SIZE ]; 
-	volatile uint8_t   m_txHead;
-	volatile uint8_t   m_txTail;
+  // tx buffer
+  volatile uint8_t   m_txBuf[ TX_RINGBUF_SIZE ]; 
+  volatile uint8_t   m_txHead;
+  volatile uint8_t   m_txTail;
 
-	// rx buffer
-	volatile uint8_t   m_rxBuf[ RX_RINGBUF_SIZE ]; 
-	volatile uint8_t   m_rxHead;
-	volatile uint8_t   m_rxTail;
+  // rx buffer
+  volatile uint8_t   m_rxBuf[ RX_RINGBUF_SIZE ]; 
+  volatile uint8_t   m_rxHead;
+  volatile uint8_t   m_rxTail;
 
-	// receiver state
-	volatile bool       m_bSending;
+  // receiver state
+  volatile bool       m_bSending;
 };
-  
+
+#endif // __SAMD21__  
 #endif // JETIEXBUSSAMD21SERIAL_H

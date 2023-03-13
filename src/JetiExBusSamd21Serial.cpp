@@ -6,6 +6,7 @@ single wire operation, compatible with Seeedstudio XIAO m0.
 
 This is an addon from nichtgedacht
 Version history: 1.0 initial
+                 2.0 using DMA for UART 
 
 JetiExBus Library is:
 ---------------------------------------------------------------------------
@@ -46,6 +47,11 @@ JetiExBusSerial * JetiExBusSerial::CreatePort(int comPort)
 
 void JetiExBusSamd21Serial::begin(uint32_t baud, uint32_t format)
 {
+
+  //-------------------------------- UART -------------------------------------------------
+
+  // Setup UART
+
 	// connect main clock GCLK0 to USART (sercom0)
   GCLK->CLKCTRL.reg = 
     GCLK_CLKCTRL_CLKEN |
@@ -93,44 +99,130 @@ ALT-SERCOM2       |  PA08	 A4  SDA |  PA09  A5  SCL   |  PA10  A2    -     |   P
 ALT-SERCOM4       |                |                  |  PB08  A6    RX    |   PB09    A7    TX     |   USART
 *******************************************************************************************************************/
 
-// Configure USART via Control A and Control B
+  // Configure USART
 
-  // implicite config becomes so this is redundant
-  SERCOM0->USART.CTRLA.bit.FORM = 0;      // no parity bit
-  SERCOM0->USART.CTRLB.bit.SBMODE = 0;    // 1 stop bit
+  // implicite config becomes:
+  // SERCOM0->USART.CTRLA.bit.FORM = 0;      // no parity bit
+  // SERCOM0->USART.CTRLB.bit.SBMODE = 0;    // 1 stop bit
   
   // Control A bits
-	SERCOM0->USART.CTRLA.reg =                  // USART is ASYNCHRONOUS
-	   SERCOM_USART_CTRLA_DORD |                // Transmit LSB First
-	   SERCOM_USART_CTRLA_MODE_USART_INT_CLK |  // Set Internal Clock 
-	   SERCOM_USART_CTRLA_RXPO(2) |             // Use SERCOM pad 2 for data reception
-	   SERCOM_USART_CTRLA_TXPO(1);              // Set SERCOM pad 2 for data transmission
+	SERCOM0->USART.CTRLA.reg =                 // USART is ASYNCHRONOUS
+		SERCOM_USART_CTRLA_DORD |                // Transmit LSB First
+		SERCOM_USART_CTRLA_MODE_USART_INT_CLK |  // Set Internal Clock 
+		SERCOM_USART_CTRLA_RXPO(2) |             // Use SERCOM pad 2 for data reception
+		SERCOM_USART_CTRLA_TXPO(1);              // Set SERCOM pad 2 for data transmission
 	
   // Control B bits
 	SERCOM0->USART.CTRLB.reg =      // We don't use PARITY
-	  SERCOM_USART_CTRLB_RXEN |     // Enable receive when USART is enabled
-		//SERCOM_USART_CTRLB_TXEN |   // Enable transmit when USART is enabled
+		SERCOM_USART_CTRLB_RXEN |     // Enable receive only when USART is enabled
 		SERCOM_USART_CTRLB_CHSIZE(0); // Set character size to 8 bits
   while (SERCOM0->USART.SYNCBUSY.bit.CTRLB) {};
 
-  //  Set USART Baud Rate
+  // Set USART Baud Rate
 	// Baud rate is (65536) * (CPU_CLock - 16 * wanted baud) / CPU_Clock
 	uint64_t baudRate = (uint64_t)65536 * (F_CPU - 16 * 125000) / F_CPU;
 	
 	// Set Baud Rate
-	// SERCOM0->USART.BAUD.reg = (uint32_t)baudRate;
-	REG_SERCOM0_USART_BAUD = (uint32_t)baudRate;
+	SERCOM0->USART.BAUD.reg = (uint32_t)baudRate;
 	
-  NVIC_EnableIRQ(SERCOM0_IRQn);       // enable SERCOM0 interrupt request
-  NVIC_SetPriority(SERCOM0_IRQn,0);   // highest priority
+  // -----------------------------------------------------------------
+  // setup DMA
 
-  SERCOM0->USART.INTENSET.bit.RXC = 1;      // enable receive complete interrupt
-  // SERCOM0->USART.INTENSET.bit.DRE = 1;   // enable data register empty interrupt
-  // SERCOM0->USART.INTENSET.bit.TXC = 1;   // enable TX complete interrupt
+  // turn on the clocks
+  PM->APBBMASK.reg |= PM_APBBMASK_DMAC;
+  PM->AHBMASK.reg |= PM_AHBMASK_DMAC;
 
-  // Finally enable Sercom peripheral
+  // reset all
+  DMAC->CTRL.bit.DMAENABLE = 0;
+  while(DMAC->CTRL.bit.DMAENABLE);
+
+  DMAC->CTRL.bit.CRCENABLE= 0;
+  while(DMAC->CTRL.bit.CRCENABLE);
+
+  DMAC->CTRL.bit.SWRST = DMAC_CTRL_SWRST;
+  while(DMAC->CTRL.bit.SWRST);
+
+  // submit base addresses
+  DMAC->BASEADDR.reg = (uint32_t)dmaDescriptor;
+  DMAC->WRBADDR.reg = (uint32_t)dmaWriteback;
+  
+  // Statc priority
+  DMAC->PRICTRL0.reg = 0;
+
+  // Priorities all highest
+  DMAC->QOSCTRL.bit.DQOS = DMAC_QOSCTRL_DQOS_HIGH_Val ;     // transfer-Priorität
+  DMAC->QOSCTRL.bit.FQOS = DMAC_QOSCTRL_FQOS_HIGH_Val;      // fetch-Priorität
+  DMAC->QOSCTRL.bit.WRBQOS = DMAC_QOSCTRL_WRBQOS_HIGH_Val;  // writeback-Priorität
+
+  // switch on all priority levels
+  DMAC->CTRL.reg |= DMAC_CTRL_LVLEN(0xF);
+
+  // enable DMA
+  DMAC->CTRL.bit.DMAENABLE = 1;
+  while(!DMAC->CTRL.bit.DMAENABLE);
+
+  //-------------------------------------------------------------------
+  
+  // setup DMA channel 0 (RX)
+  DMAC->CHID.reg =  DMAC_CHID_ID(0);    // select channel 0
+  DMAC->CHCTRLA.reg = 0;                // set diabled
+  while(DMAC->CHCTRLA.reg != 0);        // wait for completion
+
+  DMAC->CHCTRLB.reg = DMAC_CHCTRLB_LVL(0) |
+                      DMAC_CHCTRLB_TRIGSRC(SERCOM0_DMAC_ID_RX) |
+                      DMAC_CHCTRLB_TRIGACT_BEAT;
+
+  // loop back descriptor to itself (run DMA channel forever)
+  dmaDescriptor[0].DESCADDR.reg = (uint32_t) &dmaDescriptor[0];
+
+  // source is USART.DATA.reg
+  dmaDescriptor[0].SRCADDR.reg = (uint32_t) &SERCOM0->USART.DATA.reg;
+
+  dmaDescriptor[0].DSTADDR.reg = (uint32_t)m_rxBuf + (uint32_t)RX_RINGBUF_SIZE;
+  dmaDescriptor[0].BTCNT.reg = (uint32_t)RX_RINGBUF_SIZE;
+
+  dmaDescriptor[0].BTCTRL.reg = DMAC_BTCTRL_VALID |
+                                DMAC_BTCTRL_BEATSIZE(0) | // beatsize 1 byte 
+                                DMAC_BTCTRL_DSTINC |      // inc destination
+                                DMAC_BTCTRL_STEPSIZE(0);  // stepzize 1 beat
+
+  //----------------------------------------------------------------------------
+
+  // setup DMA channel 1 (TX)
+  DMAC->CHID.reg = DMAC_CHID_ID(1);
+  DMAC->CHCTRLA.reg = 0;
+  while(DMAC->CHCTRLA.reg != 0);
+
+  DMAC->CHCTRLB.reg = DMAC_CHCTRLB_LVL(0) |
+                      DMAC_CHCTRLB_TRIGSRC(SERCOM0_DMAC_ID_TX) |
+                      DMAC_CHCTRLB_TRIGACT_BEAT;
+
+  dmaDescriptor[1].DESCADDR.reg = 0; // no next discriptor
+
+  // destination is USART.DATA.reg
+  dmaDescriptor[1].DSTADDR.reg = (uint32_t) &SERCOM0->USART.DATA.reg;
+
+  dmaDescriptor[1].BTCTRL.reg = DMAC_BTCTRL_VALID |
+                                DMAC_BTCTRL_BLOCKACT_INT |  // disable plus interrupt
+                                DMAC_BTCTRL_BEATSIZE(0) |   // beatsize 1 byte 
+                                DMAC_BTCTRL_SRCINC |        // inc destination
+                                DMAC_BTCTRL_STEPSEL |       // stepsize apply to SRC
+                                DMAC_BTCTRL_STEPSIZE(0);    // stepzize 1 beat
+
+  //----------------------------------------------------------------------------
+
+  // finally enable DMA channel 0 (DMA RX running forever)
+  DMAC->CHID.bit.ID = DMAC_CHID_ID(0);
+  DMAC->CHCTRLA.bit.ENABLE = 1;
+  while(!DMAC->CHCTRLA.bit.ENABLE);
+
+  // and then the USART (only RX enabled in setup)
   SERCOM0->USART.CTRLA.bit.ENABLE = 1;
   while(SERCOM0->USART.SYNCBUSY.bit.ENABLE) {};
+
+  // enable interrupts for DMA
+  NVIC_EnableIRQ(DMAC_IRQn);
+  NVIC_SetPriority(DMAC_IRQn,0);
 
   // init tx ring buffer 
   m_txHead = 0;
@@ -153,154 +245,83 @@ ALT-SERCOM4       |                |                  |  PB08  A6    RX    |   P
 // Byte available?
 int JetiExBusSamd21Serial::available(void)
 {
-   return m_rxHead != m_rxTail;
+  // BTCNT counts down
+  return m_rxHead != RX_RINGBUF_SIZE - DMAC->ACTIVE.bit.BTCNT  &&
+                               DMAC->ACTIVE.bit.ABUSY  &&
+                               !m_bSending;
 }
+
 
 // Read one byte
 int JetiExBusSamd21Serial::read(void)
 {
   uint8_t c = 0;
 
-  if ( m_rxTail != m_rxHead ) // atomic operation
+  // BTCNT counts down
+  if ( m_rxHead != RX_RINGBUF_SIZE - DMAC->ACTIVE.bit.BTCNT  && DMAC->ACTIVE.bit.ABUSY )
   {
-    NVIC_DisableIRQ(SERCOM0_IRQn);
-    __DSB();
-    __ISB();
-
     c = m_rxBuf[m_rxHead];
     m_rxHead = (m_rxHead + 1) % RX_RINGBUF_SIZE;
-
-    NVIC_EnableIRQ(SERCOM0_IRQn);
   }
 
   return c;
 }
-
-// Write one byte  
 size_t JetiExBusSamd21Serial::write(const uint8_t *buffer, size_t size)
 {
-
-  NVIC_DisableIRQ(SERCOM0_IRQn);
-  __DSB();
-  __ISB();
-
   size_t ret = size;
+  m_txTail = 0;
 
+  // fill buffer first
   for( uint8_t i = 0; i < size; i++ )
   {
-    if ( (m_txTail + 1) % TX_RINGBUF_SIZE != m_txHead )
-	  {
       m_txBuf[m_txTail] = buffer[i];
       m_txTail = (m_txTail + 1) % TX_RINGBUF_SIZE;
-	  }
-	  else
-	  {
-		  ret = i;
-		  break;
-	  }
-  }
+	}
 
-  // enable transmitter
   if( !m_bSending )
   {
-  #ifdef LED_DEBUG
-    digitalWrite(13, HIGH ); 
-  #endif
-    m_bSending    = true;
+    m_bSending = true;
 
-    SERCOM0->USART.INTENCLR.bit.RXC = 1;  // disable receiver and receiver interrupt
+    // disable receiver
     SERCOM0->USART.CTRLB.bit.RXEN = 0;
+    while (SERCOM0->USART.SYNCBUSY.bit.CTRLB) {};
 
-    SERCOM0->USART.INTENSET.bit.DRE = 1;  // enable transmitter and tx register empty interrupt
+    // setup channel 1 for data size
+    dmaDescriptor[1].SRCADDR.reg = (uint32_t)m_txBuf + (uint32_t)size;
+    dmaDescriptor[1].BTCNT.reg = (uint32_t)size;
+
+    // enable DMA channel 1 (becomes disabled after transfer by blockaction)
+    DMAC->CHID.bit.ID = DMAC_CHID_ID(1);
+    DMAC->CHCTRLA.bit.ENABLE = 1;
+    while(!DMAC->CHCTRLA.bit.ENABLE);
+
+    // Transfer Complete interrupt
+    DMAC->CHINTENSET.bit.TCMPL = 1;
+
+    // enable transmitter
     SERCOM0->USART.CTRLB.bit.TXEN = 1;
     while (SERCOM0->USART.SYNCBUSY.bit.CTRLB) {};
+
   }
-
-  NVIC_EnableIRQ(SERCOM0_IRQn);
-
   return ret;
 }
 
-void SERCOM0_Handler() // name predefined by startup code 
+void DMAC_Handler()
 {
+  // Transfer Complete interrupt ( only this was enabled )
 
-  if (SERCOM0->USART.INTFLAG.reg & SERCOM_USART_INTFLAG_DRE && SERCOM0->USART.INTENSET.reg & SERCOM_USART_INTENSET_DRE)  // if interrupt flag is set AND interrupt is enabled
-  {
+  DMAC->CHID.bit.ID = DMAC_CHID_ID(1);
+  DMAC->CHINTFLAG.reg = DMAC_CHINTFLAG_TCMPL;   // clear interrupt flag
 
-    // Data Register Empty interrupt
-    
-    if( _pInstance->m_txTail != _pInstance->m_txHead )
-    {
-  
-      SERCOM0->USART.DATA.reg = _pInstance->m_txBuf[_pInstance->m_txHead];
-      _pInstance->m_txHead = (_pInstance->m_txHead + 1) % JetiExBusSamd21Serial::TX_RINGBUF_SIZE;
+  // disable transmitter (waits for completed ongoing transmission)
+  SERCOM0->USART.CTRLB.bit.TXEN = 0;
+  while (SERCOM0->USART.SYNCBUSY.bit.CTRLB) {};
 
-    }
-    else
-    {
-      // enable TX complete interrupt to get a signal for end of transmission
-      SERCOM0->USART.INTENCLR.bit.DRE = 1;   // disable data register empty interrupt
-      SERCOM0->USART.INTENSET.bit.TXC = 1;   // enable TX complete interrupt
+  // enable UART receiver
+  SERCOM0->USART.CTRLB.bit.RXEN = 1;
+  while (SERCOM0->USART.SYNCBUSY.bit.CTRLB) {};
 
-      // alternative coded
-      //SERCOM0->USART.INTENCLR.reg |= SERCOM_USART_INTENCLR_DRE;
-      //SERCOM0->USART.INTENSET.reg |= SERCOM_USART_INTENSET_TXC;
-      
-      _pInstance->m_bSending = false;
-    }
-  }
-
-  if (SERCOM0->USART.INTFLAG.reg & SERCOM_USART_INTFLAG_RXC && SERCOM0->USART.INTENSET.reg & SERCOM_USART_INTENSET_RXC)  // if interrupt flag is set AND interrupt is enabled
-  {
-
-    // Receive Complete interrupt
-
-#ifdef LED_DEBUG
-    digitalWrite( 13, LOW ); 
-#endif
-    //if ((_pInstance->m_rxTail + 1) % _pInstance->RX_RINGBUF_SIZE != _pInstance->m_rxHead ) // if not buffer full
-    //{
-      _pInstance->m_rxBuf[_pInstance->m_rxTail] = SERCOM0->USART.DATA.reg;
-      _pInstance->m_rxTail = (_pInstance->m_rxTail + 1) % _pInstance->RX_RINGBUF_SIZE;
-    //}
-    //else
-    //{
-    //  SERCOM0->USART.INTENCLR.bit.RXC = 1;
-    //  SERCOM0->USART.CTRLB.bit.RXEN = 0;
-    //  while (SERCOM0->USART.SYNCBUSY.bit.CTRLB) {};
-    //}
-#ifdef LED_DEBUG
-    digitalWrite( 13, HIGH ); 
-#endif
-
-  }
-
-  if (SERCOM0->USART.INTFLAG.reg & SERCOM_USART_INTFLAG_TXC && SERCOM0->USART.INTENSET.reg & SERCOM_USART_INTENSET_TXC)
-  {
-
-    // Transmission Complete interrupt
-
-    // clear TXC interrupt flag ??????????????????
-    SERCOM0->USART.INTFLAG.bit.TXC = 1;
-
-    // switch to receive mode
-    SERCOM0->USART.INTENCLR.bit.TXC = 1;  // disable TXC interrupt
-
-    SERCOM0->USART.CTRLB.bit.TXEN = 0;    // disable transmitter
-    SERCOM0->USART.INTENCLR.bit.TXC = 1;  // disable TXC interrupt
-    SERCOM0->USART.CTRLB.bit.RXEN = 1;    // enable receiver
-    while (SERCOM0->USART.SYNCBUSY.bit.CTRLB) {};
-    SERCOM0->USART.INTENSET.bit.RXC = 1;  // enable RXC interrupt
-
-    // clear receiver buffer
-    _pInstance->m_rxHead = 0;
-    _pInstance->m_rxTail = 0;
-
-#ifdef LED_DEBUG
-    digitalWrite( 13, LOW ); 
-#endif
-
-  }
+  _pInstance->m_bSending = false;
 }
 
 /*
