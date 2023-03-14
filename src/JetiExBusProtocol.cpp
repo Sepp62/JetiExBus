@@ -116,7 +116,7 @@ void JetiExBusProtocol::DoJetiExBus()
 		else if ( m_state == WAIT_END )
 		{
 			m_exBusBuffer[m_nBytes++] = c;
-			if ( m_nBytes == m_nPacketLen )
+			if ( m_nBytes >= m_nPacketLen )
 			{
 				if (ReceiveCRCCheck() )
 				{
@@ -131,8 +131,10 @@ void JetiExBusProtocol::DoJetiExBus()
 					// packet is a telemetry request
 					else if( m_exBusBuffer[ 4 ] == 0x3a && m_bReleaseBus )
 					{
+//						digitalWrite(PIN_A0, HIGH);
 						SendTelemetryData();
 						m_bBusReleased = true;
+//						digitalWrite(PIN_A0, LOW);
 					}
 					// packet is a Jetibox request
 					else if (m_exBusBuffer[4] == 0x3b && m_bReleaseBus )
@@ -153,11 +155,10 @@ void JetiExBusProtocol::DecodeChannelData()
 	// Serial.print("c");
 
 	m_nNumChannels = m_exBusBuffer[5] / 2;  // number of channels
-	
-	uint16_t * pChannel = (uint16_t*)&m_exBusBuffer[6];  // first channel data position
+
 	for (int i = 0; i < m_nNumChannels; i++)
-		m_channelValues[i] = *(pChannel++);
-	
+		m_channelValues[i] = ((m_exBusBuffer[6 + (i << 1)]) | (m_exBusBuffer[7 + (i << 1)] << 8 )) >> 3;   
+
 	m_bNewChannelData = true;
 }
 

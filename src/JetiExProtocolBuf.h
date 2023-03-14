@@ -37,7 +37,7 @@
  #include <WProgram.h>
 #endif
 
-#ifndef ESP32
+#if !defined(ESP32) and !defined(__SAMD21__)
   #include <new.h>
 #endif 
 
