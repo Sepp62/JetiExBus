@@ -3,6 +3,8 @@
 Serial interface to send telemetry and receive channel data to/from Jeti Duplex receivers via EX Bus.
 Current version is for Teensy 3.x., AtMega32u4 and ESP32
 
+Find a further developed version here: https://github.com/nichtgedacht/JetiExBus
+
   Version history:
 
     0.90   02/08/2018  created
